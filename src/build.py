@@ -16,6 +16,9 @@ logger = logging.getLogger()
 def main():
     logger.info("Initiating build sequence")
     start = time()
+    artifacts = Path(os.getcwd()).joinpath('artifacts')
+    shutil.rmtree(artifacts, ignore_errors=True)
+    os.mkdir(artifacts)
     c = 0
     for dir in Path(os.getcwd()).iterdir():
         if dir.is_dir() and dir.name != 'artifacts':
@@ -29,7 +32,7 @@ def build_dir(dir:Path):
     logger.info(f"Building {dir.name}")
     start = time()
     # create temp dir structure
-    temp_dir = Path(os.getcwd()).joinpath("artifacts").joinpath(f"{dir.name}_build")
+    temp_dir = Path(os.getcwd()).joinpath('artifacts').joinpath(f"{dir.name}_build")
     shutil.rmtree(temp_dir, ignore_errors=True)
     os.mkdir(temp_dir)
     # determine if source code or lambda layer
