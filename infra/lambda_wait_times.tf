@@ -1,7 +1,7 @@
 resource "aws_lambda_event_source_mapping" "wait_time_lambda" {
   event_source_arn = aws_sqs_queue.park_id_queue.arn
   function_name    = aws_lambda_function.wait_time_lambda.function_name
-  batch_size       = 1
+  batch_size       = 10
 }
 
 resource "aws_lambda_function" "wait_time_lambda" {
