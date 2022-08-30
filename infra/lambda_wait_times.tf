@@ -1,7 +1,7 @@
 resource "aws_lambda_event_source_mapping" "wait_time_lambda" {
   event_source_arn = aws_sqs_queue.park_id_queue.arn
   function_name    = aws_lambda_function.wait_time_lambda.function_name
-  batch_size       = 10
+  batch_size       = 5
 }
 
 resource "aws_lambda_function" "wait_time_lambda" {
@@ -18,6 +18,8 @@ resource "aws_lambda_function" "wait_time_lambda" {
       destination_bucket = aws_s3_bucket.wait_time_bucket.bucket
     }
   }
+
+  timeout = 5
 }
 
 resource "aws_lambda_permission" "wait_time_lambda" {

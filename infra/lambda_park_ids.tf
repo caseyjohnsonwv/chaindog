@@ -10,6 +10,7 @@ resource "aws_lambda_function" "park_id_lambda" {
   environment {
     variables = {
       queue_url = aws_sqs_queue.park_id_queue.url
+      destination_bucket = aws_s3_bucket.wait_time_bucket.bucket
     }
   }
 }
@@ -58,6 +59,16 @@ resource "aws_iam_role_policy" "park_id_lambda" {
           "sqs:SendMessage",
         ]
         Resource = "${aws_sqs_queue.park_id_queue.arn}"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+        ]
+        Resource = [
+          "${aws_s3_bucket.wait_time_bucket.arn}",
+          "${aws_s3_bucket.wait_time_bucket.arn}/*"
+        ]
       }
     ]
   })

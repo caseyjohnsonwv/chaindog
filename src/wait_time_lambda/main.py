@@ -18,7 +18,7 @@ def lambda_handler(event=None, context=None):
 
         url = f"{base_url}/{park_id}/queue_times.json"
         j = requests.get(url).json()
-        data = [park, j]
+        data = {'park':park, 'waits':j}
         with open(local_file, 'w') as f:
             json.dump(data, f)
 
