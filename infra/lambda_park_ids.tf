@@ -9,10 +9,12 @@ resource "aws_lambda_function" "park_id_lambda" {
 
   environment {
     variables = {
-      queue_url = aws_sqs_queue.park_id_queue.url
+      queue_url          = aws_sqs_queue.park_id_queue.url
       destination_bucket = aws_s3_bucket.wait_time_bucket.bucket
     }
   }
+
+  timeout = 30
 }
 
 resource "aws_lambda_permission" "park_id_lambda" {

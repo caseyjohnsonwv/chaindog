@@ -1,26 +1,84 @@
 import json
 from os import getenv
+from re import findall
 import boto3
+from boto3.dynamodb.conditions import Key
+from dynamodb_json import json_util as djson
 
 
-source_bucket = getenv('source_bucket')
-park_id = int(getenv('park_id'))
+aws_region = getenv('aws_region') or 'us-east-2'
+source_bucket = getenv('source_bucket') or 'wait-time-bucket-dev'
+sns_topic_arn = getenv('sns_topic_arn') or 'arn:aws:sns:us-east-2:076218402253:sms_topic_dev'
+watch_table_name = getenv('watch_table_name') or 'Watches_dev'
+dynamodb_index_name = getenv('dynamodb_index_name') or 'search_by_park_id'
 
 
 def lambda_handler(event=None, context=None):
-    s3 = boto3.client('s3')
+    message = json.loads(event['Records'][0]['Sns']['Message'])
+    s3_key = message['Records'][0]['s3']['object']['key']
+    park_id = int(findall('\d+', s3_key)[0])
 
+    # get active watches from watch table
+    dynamodb = boto3.resource('dynamodb', region_name=aws_region)
+    table = dynamodb.Table(watch_table_name)
+    watches = table.query(
+        IndexName=dynamodb_index_name,
+        KeyConditionExpression=Key('park_id').eq(park_id),
+    )['Items']
+    ride_ids = ','.join([str(int(item['ride_id'])) for item in watches])
+    print(f"{len(watches)} watches open for park_id = {park_id}")
+    if len(watches) == 0:
+        return
+
+    # get wait times for rides actively being watched
+    expression = f"select * from s3object[*].waits.lands[*].rides[*] as s where s.id in ({ride_ids})"
+    print(expression)
+    s3 = boto3.client('s3')
     r = s3.select_object_content(
             Bucket=source_bucket,
-            Key=f"{park_id}.json",
+            Key=s3_key,
             ExpressionType='SQL',
-            Expression="select * from s3object[*].waits.lands[*].rides[*] as s where s.name = 'Blue Streak'",
+            Expression=expression,
             InputSerialization={'JSON': {"Type": "Lines"}},
             OutputSerialization={'JSON': {}}
     )
+    for item in r['Payload']:
+        if 'Records' in item:
+            records = item['Records']['Payload'].decode('utf-8')
+            records = [json.loads(record) for record in records.strip().split('\n')]
 
-    for event in r['Payload']:
-        if 'Records' in event:
-            records = event['Records']['Payload'].decode('utf-8')
-            j = json.loads(records)
-            print(j)
+    # use two pointer logic to publish watches on sns if their conditions have been met
+    # both lists are sorted by default thanks to dynamodb range key
+    sns = boto3.client('sns')
+    w,r = 0,0
+    while r < len(records):
+        while w < len(watches) and watches[w]['ride_id'] == records[r]['id']:
+            if int(records[r]['wait_time']) <= int(watches[w]['wait_time_minutes']):
+                print(f"Ready to close ({watches[w]['wait_time_minutes']}) {watches[w]['ride_name']} for {watches[w]['phone_number']} (current = {records[r]['wait_time']})")
+                watch = djson.loads(watches[w])
+                sns.publish(
+                    TargetArn=sns_topic_arn,
+                    Message=json.dumps(watch),
+                )
+                table.delete_item(
+                    Key={'watch_id':watch['watch_id']}
+                )
+            else:
+                print(f"Skipped ({watches[w]['wait_time_minutes']}) {watches[w]['ride_name']} for {watches[w]['phone_number']} (current = {records[r]['wait_time']})")
+            w += 1
+        r += 1
+
+
+# if __name__ == '__main__':
+#     event = {
+#         'Records' : [
+#             {'s3' :
+#                 {'object':
+#                     {'key':
+#                         'wait-times/50.json'
+#                     }
+#                 }
+#             }
+#         ]
+#     }
+#     lambda_handler(event=event, context={})

@@ -12,8 +12,8 @@ def lambda_handler(event=None, context=None):
     for record in event['Records']:
         park = json.loads(record['body'])
         park_id = park['id']
-        key = f"{park_id}.json"
-        local_file = f"/tmp/{key}"
+        key = f"wait-times/{park_id}.json"
+        local_file = f"/tmp/{park_id}.json"
         print(f"Fetching {park['name']}")
 
         url = f"{base_url}/{park_id}/queue_times.json"
