@@ -50,35 +50,28 @@ def lambda_handler(event=None, context=None):
     # use two pointer logic to publish watches on sns if their conditions have been met
     # both lists are sorted by default thanks to dynamodb range key
     sns = boto3.client('sns')
+    closed_watches = 0
     w,r = 0,0
     while r < len(records):
         while w < len(watches) and watches[w]['ride_id'] == records[r]['id']:
-            if int(records[r]['wait_time']) <= int(watches[w]['wait_time_minutes']):
-                print(f"Ready to close ({watches[w]['wait_time_minutes']}) {watches[w]['ride_name']} for {watches[w]['phone_number']} (current = {records[r]['wait_time']})")
-                watch = djson.loads(watches[w])
+            watch = djson.loads(watches[w])
+            watch['expiration'] = watch['expiration'].isoformat()
+            if int(records[r]['wait_time']) <= int(watch['wait_time_minutes']):
+                print(f"Closing {watch} ::: current = {records[r]['wait_time']}")
+                data = {
+                    'watch' : watch,
+                    'record' : records[r],
+                }
                 sns.publish(
                     TargetArn=sns_topic_arn,
-                    Message=json.dumps(watch),
+                    Message=json.dumps(data),
                 )
                 table.delete_item(
                     Key={'watch_id':watch['watch_id']}
                 )
+                closed_watches += 1
             else:
-                print(f"Skipped ({watches[w]['wait_time_minutes']}) {watches[w]['ride_name']} for {watches[w]['phone_number']} (current = {records[r]['wait_time']})")
+                print(f"Skipping {watch} ::: current = {records[r]['wait_time']}")
             w += 1
         r += 1
-
-
-# if __name__ == '__main__':
-#     event = {
-#         'Records' : [
-#             {'s3' :
-#                 {'object':
-#                     {'key':
-#                         'wait-times/50.json'
-#                     }
-#                 }
-#             }
-#         ]
-#     }
-#     lambda_handler(event=event, context={})
+    print(f"Closed {closed_watches} watches")

@@ -1,7 +1,8 @@
 resource "aws_lambda_event_source_mapping" "wait_time_lambda" {
-  event_source_arn = aws_sqs_queue.park_id_queue.arn
-  function_name    = aws_lambda_function.wait_time_lambda.function_name
-  batch_size       = 5
+  event_source_arn                   = aws_sqs_queue.park_id_queue.arn
+  function_name                      = aws_lambda_function.wait_time_lambda.function_name
+  batch_size                         = 100
+  maximum_batching_window_in_seconds = 15
 }
 
 resource "aws_lambda_function" "wait_time_lambda" {
@@ -19,7 +20,7 @@ resource "aws_lambda_function" "wait_time_lambda" {
     }
   }
 
-  timeout = 5
+  timeout = 120
 }
 
 resource "aws_lambda_permission" "wait_time_lambda" {

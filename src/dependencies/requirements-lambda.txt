@@ -1,2 +1,4 @@
-requests
 dynamodb-json
+twilio
+phonenumbers
+requests
