@@ -15,6 +15,14 @@ resource "aws_dynamodb_table" "watch_table" {
   }
 
   global_secondary_index {
+    hash_key        = "phone_number"
+    name            = "search_by_phone_number"
+    projection_type = "ALL"
+    read_capacity   = 10
+    write_capacity  = 10
+  }
+
+  global_secondary_index {
     hash_key        = "expiration"
     name            = "search_by_expiration"
     projection_type = "ALL"
@@ -35,6 +43,11 @@ resource "aws_dynamodb_table" "watch_table" {
   attribute {
     name = "ride_id"
     type = "N"
+  }
+
+  attribute {
+    name = "phone_number"
+    type = "S"
   }
 
   attribute {

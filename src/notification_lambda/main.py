@@ -55,7 +55,6 @@ def lambda_handler(event=None, context=None):
     while r < len(records):
         while w < len(watches) and watches[w]['ride_id'] == records[r]['id']:
             watch = djson.loads(watches[w])
-            watch['expiration'] = watch['expiration'].isoformat()
             if int(records[r]['wait_time']) <= int(watch['wait_time_minutes']):
                 print(f"Closing {watch} ::: current = {records[r]['wait_time']}")
                 data = {

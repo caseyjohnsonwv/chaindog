@@ -2,6 +2,7 @@ from datetime import datetime
 import json
 from os import getenv
 import phonenumbers as pn
+import pytz
 from twilio.rest import Client
 
 
@@ -18,8 +19,10 @@ def lambda_handler(event=None, context=None):
         
         # create text message
         target_phone_number = watch['phone_number']
-        expiration = datetime.fromisoformat(watch['expiration'])
-        if expiration < datetime.now():
+        utc = pytz.timezone('UTC')
+        now_utc = datetime.now().astimezone(utc)
+        expiration = datetime.fromisoformat(watch['expiration']).astimezone(utc)
+        if expiration < now_utc:
             msg = f"Your watch for {watch['ride_name']} has expired - the line did not get shorter than {watch['wait_time_minutes']} minutes!"
         else:
             msg = f"The line for {watch['ride_name']} is currently {record['wait_time']} minutes!"
