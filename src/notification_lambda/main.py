@@ -55,11 +55,12 @@ def lambda_handler(event=None, context=None):
     while r < len(records):
         while w < len(watches) and watches[w]['ride_id'] == records[r]['id']:
             watch = djson.loads(watches[w])
-            if int(records[r]['wait_time']) <= int(watch['wait_time_minutes']):
+            if int(records[r]['wait_time']) <= int(watch['wait_time_minutes']) and records[r]['is_open']:
                 print(f"Closing {watch} ::: current = {records[r]['wait_time']}")
+                msg = f"The line for {watch['ride_name']} is currently {records[r]['wait_time']} minutes!"
                 data = {
-                    'watch' : watch,
-                    'record' : records[r],
+                    'message' : msg,
+                    'target_phone_number' : watch['phone_number'],
                 }
                 sns.publish(
                     TargetArn=sns_topic_arn,
