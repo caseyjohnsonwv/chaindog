@@ -42,8 +42,8 @@ The variable `upstream_env_name` in `terraform.tfvars` allows lower environments
 This is to reduce your impact on the upstream data source Queue-Times; it also reduces the number of Lambda functions executing concurrently in your AWS account.
 
 To create separate production and development environments **consuming the same data**:
-1. Follow the Quickstart guide for a workspace named `dev`.
-2. Follow the Quickstart guide again for a workspace named `prod`. When setting variables in `terraform.tfvars`, change the Twilio phone number to a new number for the new environment. Also add the below variable:
+1. Follow the Quickstart guide for a workspace named `prod`.
+2. Follow the Quickstart guide again for a workspace named `dev`. When setting variables in `terraform.tfvars`, change the Twilio phone number to a new number for the new environment. Also add the below variable:
 ```
 upstream_env_name = "prod"
 ```
