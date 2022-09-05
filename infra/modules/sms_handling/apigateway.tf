@@ -1,5 +1,5 @@
 resource "aws_api_gateway_rest_api" "twilio" {
-  name = "chaindog_twilio_${terraform.workspace}"
+  name = "chaindog_twilio_${var.env_name}"
 }
 
 resource "aws_api_gateway_resource" "twilio" {
@@ -63,7 +63,7 @@ resource "aws_api_gateway_deployment" "twilio" {
   }
 
   triggers = {
-    timestamp = sha256(file("${path.root}/apigateway.tf"))
+    timestamp = sha256(file("${path.module}/apigateway.tf"))
   }
 
   depends_on = [
@@ -77,11 +77,11 @@ resource "aws_api_gateway_deployment" "twilio" {
 resource "aws_api_gateway_stage" "twilio" {
   rest_api_id   = aws_api_gateway_rest_api.twilio.id
   deployment_id = aws_api_gateway_deployment.twilio.id
-  stage_name    = terraform.workspace
+  stage_name    = var.env_name
 }
 
 resource "aws_iam_role" "twilio" {
-  name = "chaindog_twilio_${terraform.workspace}"
+  name = "chaindog_twilio_${var.env_name}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -97,7 +97,7 @@ resource "aws_iam_role" "twilio" {
 }
 
 resource "aws_iam_role_policy" "twilio" {
-  name = "chaindog_twilio_${terraform.workspace}"
+  name = "chaindog_twilio_${var.env_name}"
   role = aws_iam_role.twilio.id
   policy = jsonencode({
     Version = "2012-10-17"

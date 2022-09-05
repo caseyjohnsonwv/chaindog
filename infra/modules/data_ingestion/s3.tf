@@ -1,5 +1,5 @@
 resource "aws_s3_bucket" "wait_time_bucket" {
-  bucket        = "wait-time-bucket-${terraform.workspace}"
+  bucket        = "wait-time-bucket-${var.env_name}"
   force_destroy = true
 }
 

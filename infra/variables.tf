@@ -12,3 +12,8 @@ variable "twilio_phone_number" {
   type      = string
   sensitive = true
 }
+
+variable "upstream_env_name" {
+  type    = string
+  default = null
+}

@@ -1,5 +1,5 @@
 resource "aws_cloudwatch_event_rule" "rule" {
-  name                = "invoke_park_id_lambda_${terraform.workspace}"
+  name                = "invoke_park_id_lambda_${var.env_name}"
   schedule_expression = "cron(0/5 * * * ? *)"
 }
 

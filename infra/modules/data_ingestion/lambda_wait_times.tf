@@ -7,12 +7,11 @@ resource "aws_lambda_event_source_mapping" "wait_time_lambda" {
 
 resource "aws_lambda_function" "wait_time_lambda" {
   filename      = "${local.artifacts_path}/wait_time_lambda.zip"
-  function_name = "wait_time_lambda_${terraform.workspace}"
+  function_name = "wait_time_lambda_${var.env_name}"
   role          = aws_iam_role.wait_time_lambda.arn
   handler       = "main.lambda_handler"
   runtime       = "python3.8"
-
-  layers = [aws_lambda_layer_version.dependencies.arn]
+  layers        = var.lambda_layer_arns
 
   environment {
     variables = {
@@ -31,7 +30,7 @@ resource "aws_lambda_permission" "wait_time_lambda" {
 }
 
 resource "aws_iam_role" "wait_time_lambda" {
-  name = "wait_time_lambda_${terraform.workspace}"
+  name = "wait_time_lambda_${var.env_name}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -47,7 +46,7 @@ resource "aws_iam_role" "wait_time_lambda" {
 }
 
 resource "aws_iam_role_policy" "wait_time_lambda" {
-  name = "wait_time_lambda_${terraform.workspace}"
+  name = "wait_time_lambda_${var.env_name}"
   role = aws_iam_role.wait_time_lambda.id
   policy = jsonencode({
     Version = "2012-10-17"

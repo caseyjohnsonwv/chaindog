@@ -1,5 +1,5 @@
 resource "aws_dynamodb_table" "watch_table" {
-  name           = "Watches_${terraform.workspace}"
+  name           = "Watches_${var.env_name}"
   hash_key       = "watch_id"
   billing_mode   = "PROVISIONED"
   read_capacity  = 10

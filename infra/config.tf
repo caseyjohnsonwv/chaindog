@@ -1,9 +1,3 @@
-locals {
-  artifacts_path = "${path.root}/../src/artifacts"
-  templates_path  = "${path.root}/templates"
-}
-
-
 terraform {
   backend "s3" {
     bucket = "caseyjohnsonwv-tfstate"
@@ -11,6 +5,3 @@ terraform {
     region = "us-east-2"
   }
 }
-
-
-data "aws_region" "current" {}

@@ -1,11 +1,10 @@
 resource "aws_lambda_function" "sms_lambda" {
   filename      = "${local.artifacts_path}/sms_lambda.zip"
-  function_name = "sms_lambda_${terraform.workspace}"
+  function_name = "sms_lambda_${var.env_name}"
   role          = aws_iam_role.sms_lambda.arn
   handler       = "main.lambda_handler"
   runtime       = "python3.8"
-
-  layers = [aws_lambda_layer_version.dependencies.arn]
+  layers        = var.lambda_layer_arns
 
   environment {
     variables = {
@@ -32,7 +31,7 @@ resource "aws_sns_topic_subscription" "sms_lambda" {
 }
 
 resource "aws_iam_role" "sms_lambda" {
-  name = "sms_lambda_${terraform.workspace}"
+  name = "sms_lambda_${var.env_name}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -48,7 +47,7 @@ resource "aws_iam_role" "sms_lambda" {
 }
 
 resource "aws_iam_role_policy" "sms_lambda" {
-  name = "sms_lambda_${terraform.workspace}"
+  name = "sms_lambda_${var.env_name}"
   role = aws_iam_role.sms_lambda.id
   policy = jsonencode({
     Version = "2012-10-17"
