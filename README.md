@@ -23,7 +23,7 @@ twilio_phone_number = ""
 ```
 3. Update the Terraform backend in `config.tf` to point to your Terraform state bucket on S3.
 4. Run `terraform workspace new dev` to create a development workspace.
-5. Run terraform apply` and type `yes` when prompted.
+5. Run terraform apply and type `yes` when prompted.
 6. Copy the output `twilio_webhook_target_url` and paste it as the POST request webhook target of your phone number on Twilio.
 7. Send a text to your Twilio phone number. For example:
 ```
