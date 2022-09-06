@@ -29,3 +29,8 @@ variable "twilio_phone_number" {
   type      = string
   sensitive = true
 }
+
+variable "watch_expiration_window_seconds" {
+  type    = number
+  default = 7200
+}

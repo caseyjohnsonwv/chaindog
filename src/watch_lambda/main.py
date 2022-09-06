@@ -36,7 +36,8 @@ def lambda_handler(event=None, context=None):
     )
 
     # use park name to get park id [s3 select]
-    expression = f"select * from s3object[*][*].parks[*] as s where s.name = '{park_name}' limit 1"
+    park_name_sanitized = park_name.replace("'","''")
+    expression = f"select * from s3object[*][*].parks[*] as s where s.name = '{park_name_sanitized}' limit 1"
     print(expression)
     s3 = boto3.client('s3')
     s3_key = 'parks.json'
@@ -55,7 +56,8 @@ def lambda_handler(event=None, context=None):
             print(f"{park_name} ::: park_id = {park_record['id']}")
 
     # use park id to query wait time by ride name [s3 select]
-    expression = f"select * from s3object[*].waits.lands[*].rides[*] as s where s.name = '{ride_name}' limit 1"
+    ride_name_sanitized = ride_name.replace("'", "''")
+    expression = f"select * from s3object[*].waits.lands[*].rides[*] as s where s.name = '{ride_name_sanitized}' limit 1"
     print(expression)
     s3 = boto3.client('s3')
     s3_key = f"wait-times/{park_record['id']}.json"

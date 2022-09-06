@@ -51,6 +51,7 @@ def build_dir(dir:Path) -> int:
     if dir.joinpath(req_file).exists():
         if ARGS.skip_dependencies:
             logger.info(f"Skipping {dir.name} due to --skip-dependencies flag")
+            shutil.rmtree(temp_dir, ignore_errors=True)
             return 0
         # building lambda layer
         placeholder = temp_dir

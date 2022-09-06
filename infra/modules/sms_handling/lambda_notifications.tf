@@ -8,11 +8,12 @@ resource "aws_lambda_function" "notification_lambda" {
 
   environment {
     variables = {
-      aws_region          = data.aws_region.current.name
-      source_bucket       = data.aws_s3_bucket.wait_time_bucket.bucket
-      sns_topic_arn       = aws_sns_topic.sms_topic.arn
-      watch_table_name    = aws_dynamodb_table.watch_table.name
-      dynamodb_index_name = "search_by_park_id"
+      aws_region                     = data.aws_region.current.name
+      source_bucket                  = data.aws_s3_bucket.wait_time_bucket.bucket
+      sns_topic_arn                  = aws_sns_topic.sms_topic.arn
+      watch_table_name               = aws_dynamodb_table.watch_table.name
+      dynamodb_index_name            = "search_by_park_id"
+      watch_extension_window_seconds = "${ceil(var.watch_expiration_window_seconds/4)}"
     }
   }
 
@@ -85,6 +86,7 @@ resource "aws_iam_role_policy" "notification_lambda" {
         Action = [
           "dynamodb:DeleteItem",
           "dynamodb:Query",
+          "dynamodb:UpdateItem",
         ]
         Resource = [
           "${aws_dynamodb_table.watch_table.arn}",

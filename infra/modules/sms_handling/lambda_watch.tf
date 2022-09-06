@@ -12,7 +12,7 @@ resource "aws_lambda_function" "watch_lambda" {
       source_bucket                   = data.aws_s3_bucket.wait_time_bucket.bucket
       watch_table_name                = aws_dynamodb_table.watch_table.name
       dynamodb_index_name             = "search_by_phone_number"
-      watch_expiration_window_seconds = 7200
+      watch_expiration_window_seconds = "${var.watch_expiration_window_seconds}"
     }
   }
 

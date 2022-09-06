@@ -24,13 +24,14 @@ module "data_ingestion" {
 }
 
 module "sms_handling" {
-  source                  = "./modules/sms_handling"
-  env_name                = terraform.workspace
-  wait_time_bucket_name   = local.wait_time_bucket_name
-  notification_topic_name = local.notification_topic_name
-  twilio_account_sid      = var.twilio_account_sid
-  twilio_auth_token       = var.twilio_auth_token
-  twilio_phone_number     = var.twilio_phone_number
+  source                          = "./modules/sms_handling"
+  env_name                        = terraform.workspace
+  wait_time_bucket_name           = local.wait_time_bucket_name
+  notification_topic_name         = local.notification_topic_name
+  twilio_account_sid              = var.twilio_account_sid
+  twilio_auth_token               = var.twilio_auth_token
+  twilio_phone_number             = var.twilio_phone_number
+  watch_expiration_window_seconds = 7200
 
   lambda_layer_arns = [
     aws_lambda_layer_version.dependencies.arn

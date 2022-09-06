@@ -22,14 +22,6 @@ resource "aws_dynamodb_table" "watch_table" {
     write_capacity  = 10
   }
 
-  global_secondary_index {
-    hash_key        = "expiration"
-    name            = "search_by_expiration"
-    projection_type = "ALL"
-    read_capacity   = 10
-    write_capacity  = 10
-  }
-
   attribute {
     name = "watch_id"
     type = "S"
@@ -47,11 +39,6 @@ resource "aws_dynamodb_table" "watch_table" {
 
   attribute {
     name = "phone_number"
-    type = "S"
-  }
-
-  attribute {
-    name = "expiration"
     type = "S"
   }
 }
