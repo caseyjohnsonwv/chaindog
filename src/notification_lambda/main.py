@@ -64,8 +64,8 @@ def lambda_handler(event=None, context=None):
     if len(watches) == 0:
         return
 
-    # determine if park is still open - assume closed if all rides are closed
-    expression = f"select count(*) as num_open_rides from s3object[*].waits.lands[*].rides[*] as s where s.is_open = True"
+    # determine if park is still open - assume closed if all coasters are closed
+    expression = f"select count(s.rides) as num_open_rides from s3object[*].waits.lands[*] as s where s.name = 'Coasters' and True in s.rides[*].is_open"
     res = query_s3(expression, s3_key)
     
     # if park is closed, expire all alerts for this park
