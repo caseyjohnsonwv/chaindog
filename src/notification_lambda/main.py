@@ -6,6 +6,7 @@ import boto3
 from boto3.dynamodb.conditions import Key
 from dynamodb_json import json_util as djson
 import pytz
+from s3_select_wrapper import query_s3
 
 
 aws_region = getenv('aws_region')
@@ -28,25 +29,6 @@ def push_sms(message, phone_number):
     )
 
 
-def query_s3(expression:str, s3_key:str) -> list:
-    print(expression)
-    s3 = boto3.client('s3')
-    r = s3.select_object_content(
-            Bucket=source_bucket,
-            Key=s3_key,
-            ExpressionType='SQL',
-            Expression=expression,
-            InputSerialization={'JSON': {"Type": "Lines"}},
-            OutputSerialization={'JSON': {}}
-    )
-    records = []
-    for item in r['Payload']:
-        if 'Records' in item:
-            records = item['Records']['Payload'].decode('utf-8')
-            records = [json.loads(record) for record in records.strip().split('\n')]
-    return records
-
-
 def lambda_handler(event=None, context=None):
     message = json.loads(event['Records'][0]['Sns']['Message'])
     s3_key = message['Records'][0]['s3']['object']['key']
@@ -64,9 +46,9 @@ def lambda_handler(event=None, context=None):
     if len(watches) == 0:
         return
 
-    # determine if park is still open - assume closed if all coasters are closed
-    expression = f"select count(s.rides) as num_open_rides from s3object[*].waits.lands[*] as s where s.name = 'Coasters' and True in s.rides[*].is_open"
-    res = query_s3(expression, s3_key)
+    # determine if park is still open - assume closed if all rides are closed
+    expression = f"select count(s.rides) as num_open_rides from s3object[*].waits.lands[*] as s where True in s.rides[*].is_open"
+    res = query_s3(expression, s3_key, source_bucket)
     
     # if park is closed, expire all alerts for this park
     if res[0]['num_open_rides'] == 0:
@@ -81,11 +63,11 @@ def lambda_handler(event=None, context=None):
 
     # if park is still open, get wait times for rides actively being watched
     expression = f"select * from s3object[*].waits.lands[*].rides[*] as s where s.id in ({ride_ids})"
-    records = query_s3(expression, s3_key)
+    records = query_s3(expression, s3_key, source_bucket)
 
     # set up timestamps to extend watches if needed
     expression = f"select s.timezone as tz from s3object[*].park as s"
-    res = query_s3(expression, s3_key)
+    res = query_s3(expression, s3_key, source_bucket)
     tz = pytz.timezone(res[0]['tz'])
     utc = pytz.timezone('UTC')
     now_utc = datetime.now().astimezone(utc)

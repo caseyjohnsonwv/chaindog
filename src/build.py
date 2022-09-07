@@ -25,8 +25,7 @@ def main():
     logger.info("Initiating build sequence")
     start = time()
     artifacts = Path(os.getcwd()).joinpath('artifacts')
-    shutil.rmtree(artifacts, ignore_errors=True)
-    os.mkdir(artifacts)
+    os.makedirs(artifacts, exist_ok=True)
     c = 0
     for dir in Path(os.getcwd()).iterdir():
         # skip artifcats directory
@@ -38,27 +37,50 @@ def main():
     logger.info(f"Built {c} Lambdas in {tdelta:.1f} seconds")
 
 
+def move_files(src:Path, dest:Path) -> None:
+    files = ' '.join([f"{src.name}/{f.name}" for f in src.iterdir()])
+    command = ['git', 'check-ignore', files]
+    res = exec(command)
+    excludes = set(p.split('/')[-1] for p in res.stdout.decode('utf-8').split('\n') if len(p) > 0)
+    logger.debug(f"Excluding {len(excludes)} .gitignore'd files")
+    if len(excludes) > 0:
+        logger.debug(', '.join(excludes))
+    for f in src.iterdir():
+        if f.name not in excludes:
+            src_f = src.joinpath(f.name)
+            dest_f = dest.joinpath(f.name)
+            shutil.copyfile(src_f, dest_f)
+
+
 def build_dir(dir:Path) -> int:
     logger.info(f"Building {dir.name}")
     start = time()
+
     # create temp dir structure
     temp_dir = Path(os.getcwd()).joinpath('artifacts').joinpath(f"{dir.name}_build")
     shutil.rmtree(temp_dir, ignore_errors=True)
     os.mkdir(temp_dir)
-    # determine if source code or lambda layer
+
+    # determine if lambda layer
     req_file ='requirements-lambda.txt'
     reqs_target = "python/lib/python3.8/site-packages"
     if dir.joinpath(req_file).exists():
+        # skip lambda layer if needed
         if ARGS.skip_dependencies:
             logger.info(f"Skipping {dir.name} due to --skip-dependencies flag")
             shutil.rmtree(temp_dir, ignore_errors=True)
             return 0
+
         # building lambda layer
         placeholder = temp_dir
         for part in reqs_target.split('/'):
             placeholder = placeholder.joinpath(part)
             os.mkdir(placeholder)
-        shutil.copyfile(f"{dir.joinpath(req_file)}", f"{temp_dir.joinpath(req_file)}")
+
+        # move source code down to lambda layer level
+        shutil.copyfile(dir.joinpath(req_file), temp_dir.joinpath(req_file))
+        move_files(dir, temp_dir.joinpath(reqs_target))
+
         # install linux requirements
         logger.debug(f"Using Docker to install requirements from {dir.name}/{req_file}")
         command = [
@@ -72,21 +94,13 @@ def build_dir(dir:Path) -> int:
             logger.error(f"Failed to build {dir.name} - is the Docker daemon running?")
             logger.error(res.stderr.decode('utf-8'))
             exit(1)
+    
     else:
-        # packaging source code
-        files = ' '.join([f"{dir.name}/{f.name}" for f in dir.iterdir()])
-        command = ['git', 'check-ignore', files]
-        res = exec(command)
-        excludes = set(p.split('/')[-1] for p in res.stdout.decode('utf-8').split('\n') if len(p) > 0)
-        logger.debug(f"Excluding {len(excludes)} .gitignore'd files")
-        if len(excludes) > 0:
-            logger.debug(', '.join(excludes))
-        for f in dir.iterdir():
-            if f.name not in excludes:
-                src = dir.joinpath(f.name)
-                dest = temp_dir.joinpath(f.name)
-                shutil.copyfile(src, dest)
+        # move source code for packaging
+        move_files(dir, temp_dir)
+
     # zip and delete temp dir
+    shutil.rmtree(f"artifacts/{dir.name}", ignore_errors=True)
     shutil.make_archive(f"artifacts/{dir.name}", 'zip', temp_dir.absolute())
     shutil.rmtree(temp_dir)
     tdelta = time() - start
