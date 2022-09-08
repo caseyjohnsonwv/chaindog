@@ -2,6 +2,7 @@ import json
 from os import getenv, remove
 import boto3
 import requests
+from s3_select_wrapper import reduce_to_ascii
 
 
 queue_url = getenv('queue_url')
@@ -14,8 +15,9 @@ def lambda_handler(event=None, context=None):
 
     key = 'parks.json'
     local_file = f"/tmp/{key}"
+    data = reduce_to_ascii(json.dumps(j, ensure_ascii=False))
     with open(local_file, 'w') as f:
-        json.dump(j, f)
+        f.write(data)
     s3 = boto3.resource('s3')
     s3.meta.client.upload_file(local_file, destination_bucket, key)
     remove(local_file)
@@ -31,7 +33,3 @@ def lambda_handler(event=None, context=None):
                     json.dumps(park)
                 )
             )
-
-
-if __name__ == '__main__':
-    lambda_handler()

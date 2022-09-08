@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-import json
 from os import getenv
 from urllib.parse import unquote_plus
 import uuid
@@ -8,7 +7,7 @@ from boto3.dynamodb.conditions import Key, Attr
 import phonenumbers as pn
 import pytz
 from twilio.twiml.messaging_response import MessagingResponse
-from s3_select_wrapper import query_s3
+from s3_select_wrapper import query_s3, reduce_to_ascii
 
 
 aws_region = getenv('aws_region')
@@ -29,7 +28,8 @@ def create_response(message):
 def lambda_handler(event=None, context=None):
     payload = {k:unquote_plus(v) for k,v in event.items()}
     # TODO: currently assuming "park \n ride \n wait time" - use NLP instead
-    park_name, ride_name, target_wait_time = [n.strip() for n in payload['Body'].split('\n')]
+    body = reduce_to_ascii(payload['Body'])
+    park_name, ride_name, target_wait_time = [n.strip() for n in body.split('\n')]
     target_wait_time = int(target_wait_time)
     phone_number = pn.format_number(
         pn.parse(payload['From'], "US"),

@@ -17,3 +17,7 @@ def query_s3(expression:str, s3_key:str, bucket:str) -> list:
             records = item['Records']['Payload'].decode('utf-8')
             records = [json.loads(record) for record in records.strip().split('\n')]
     return records
+
+
+def reduce_to_ascii(string:str) -> str:
+    return string.encode('ascii', errors='ignore').decode()

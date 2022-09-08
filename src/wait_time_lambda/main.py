@@ -2,6 +2,7 @@ import json
 from os import getenv, remove
 import boto3
 import requests
+from s3_select_wrapper import reduce_to_ascii
 
 
 destination_bucket = getenv('destination_bucket')
@@ -19,14 +20,11 @@ def lambda_handler(event=None, context=None):
         url = f"{base_url}/{park_id}/queue_times.json"
         j = requests.get(url).json()
         data = {'park':park, 'waits':j}
+        data = reduce_to_ascii(json.dumps(data, ensure_ascii=False))
         with open(local_file, 'w') as f:
-            json.dump(data, f)
+            f.write(data)
 
         s3 = boto3.resource('s3')
         s3.meta.client.upload_file(local_file, destination_bucket, key)
         remove(local_file)
         print(f"Fetched and uploaded {park['name']}")
-
-
-if __name__ == '__main__':
-    lambda_handler()
