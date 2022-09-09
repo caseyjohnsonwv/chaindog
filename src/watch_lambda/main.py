@@ -49,24 +49,7 @@ def lambda_handler(event=None, context=None):
     ride_record = query_s3(expression, s3_key, source_bucket)[0]
     print(f"{ride_name} ::: wait_time = {ride_record['wait_time']} (is_open = {ride_record['is_open']})")
     
-    # ensure ride is open and line is long enough to warrant a watch
-    if not ride_record['is_open']:
-        # check if the rest of the park is closed - assume closed if all rides are closed
-        expression = f"select count(s.rides) as num_open_rides from s3object[*].waits.lands[*] as s where True in s.rides[*].is_open"
-        res = query_s3(expression, s3_key, source_bucket)
-        if res[0]['num_open_rides'] == 0:
-            print(f"ISSUE: {park_record['name']} is closed")
-            msg = f"Our data shows that {park_record['name']} is currently closed!"
-        else:
-            print(f"ISSUE: {ride_record['name']} is closed")
-            msg = f"Our data shows that {ride_record['name']} is currently closed - try again later!"
-        return create_response(msg)
-    elif ride_record['wait_time'] <= target_wait_time:
-        print(f"ISSUE: line already short enough")
-        msg = f"The line for {ride_record['name']} is currently {ride_record['wait_time']} minutes!"
-        return create_response(msg)
-
-    # ensure no wait for this ride/phone combination exists [dynamo query] (enhancement: if it does, update it)
+    # grab any existing watches for this ride/phone combination
     dynamodb = boto3.resource('dynamodb', region_name=aws_region)
     table = dynamodb.Table(watch_table_name)
     watches = table.query(
@@ -75,29 +58,77 @@ def lambda_handler(event=None, context=None):
         FilterExpression=Attr('ride_id').eq(ride_record['id']),
         Limit=1,
     )['Items']
-    if len(watches) > 0:
-        print(f"ISSUE: {phone_number} already has a watch open for {ride_record['name']} at {park_record['name']}")
-        msg = f"You are already watching {ride_record['name']} for a queue time of {target_wait_time} minutes!"
-        return create_response(msg)
 
-    # create the watch in dynamo
+    # set up timezones / datetimes
     utc = pytz.timezone('UTC')
     tz = pytz.timezone(park_record['timezone'])
     expiration = datetime.now().astimezone(utc) + timedelta(seconds=watch_expiration_window_seconds)
     expiration_readable = expiration.astimezone(tz).strftime('%-I:%M')
-    data = {
-        'watch_id' : str(uuid.uuid4()),
-        'park_id' : park_record['id'],
-        'park_name' : park_record['name'],
-        'ride_id' : ride_record['id'],
-        'ride_name' : ride_record['name'],
-        'wait_time_minutes' : target_wait_time,
-        'phone_number' : phone_number,
-        'expiration' : expiration.isoformat()
-    }
-    table.put_item(Item=data)
-    print(f"Created watch in Dynamo: {data}")
+    
+    # ensure ride is open
+    if not ride_record['is_open']:
+        expression = f"select count(s.rides) as num_open_rides from s3object[*].waits.lands[*] as s where True in s.rides[*].is_open"
+        res = query_s3(expression, s3_key, source_bucket)
+        # tell user the park is closed
+        if res[0]['num_open_rides'] == 0:
+            print(f"ISSUE: {park_record['name']} is closed")
+            msg = f"Our data shows that {park_record['name']} is currently closed!"
+        # tell user the ride is closed
+        else:
+            print(f"ISSUE: {ride_record['name']} is closed")
+            msg = f"Our data shows that {ride_record['name']} is currently closed - try again later!"
+        return create_response(msg)
 
-    # return to apigateway
-    msg = f"Now watching {ride_record['name']} until {expiration_readable} for a queue time of {target_wait_time} minutes or less! Currently {ride_record['wait_time']} min. Powered by https://queue-times.com/parks/{park_record['id']}."
-    return create_response(msg)
+    # ensure line is long enough to warrant a watch
+    elif ride_record['wait_time'] <= target_wait_time:
+        print(f"ISSUE: line already short enough")
+        msg = f"The line for {ride_record['name']} is currently {ride_record['wait_time']} minutes!"
+        # if user has a watch open, tell them and keep watching
+        if len(watches) > 0:
+            user_exp = datetime.fromisoformat(watches[0]['expiration']).astimezone(tz).strftime('%-I:%M')
+            msg = ' '.join([msg, f"We'll keep watching for a wait under {watches[0]['wait_time_minutes']} minutes until {user_exp}."])
+        return create_response(msg)
+
+    # if watch exists, update it with new wait time
+    if len(watches) == 1:
+        data = watches[0]
+        # vary message if times are the same
+        if data['wait_time_minutes'] == target_wait_time:
+            print(f"Duplicate watch request from user ::: {data}")
+            msg = f"You're already watching {ride_record['name']} for a line shorter than {data['wait_time_minutes']} minutes! Currently {ride_record['wait_time']} min. We'll extend your watch until {expiration_readable}."
+        else:
+            msg = f"Updated your {ride_record['name']} watch to {target_wait_time} minutes and extended until {expiration_readable}! Currently {ride_record['wait_time']} min."
+        # extend watch and update target time if needed
+        table.update_item(
+            Key = {
+                'watch_id' : data['watch_id']
+            },
+            UpdateExpression = 'SET wait_time_minutes = :wt_min, expiration = :exp_ts',
+            ExpressionAttributeValues = {
+                ':wt_min' : target_wait_time,
+                ':exp_ts' : expiration.isoformat()
+            }
+        )
+        print(f"Updated watch {data['watch_id']} in Dynamo")
+        return create_response(msg)
+
+    # else, create a new one
+    elif len(watches) == 0:
+        data = {
+            'watch_id' : str(uuid.uuid4()),
+            'park_id' : park_record['id'],
+            'park_name' : park_record['name'],
+            'ride_id' : ride_record['id'],
+            'ride_name' : ride_record['name'],
+            'wait_time_minutes' : target_wait_time,
+            'phone_number' : phone_number,
+            'expiration' : expiration.isoformat()
+        }
+        table.put_item(Item=data)
+        print(f"Created watch in Dynamo: {data}")
+        msg = f"Now watching {ride_record['name']} until {expiration_readable} for a queue time of {target_wait_time} minutes or less! Currently {ride_record['wait_time']} min. Powered by https://queue-times.com/parks/{park_record['id']}."
+        return create_response(msg)
+    
+    # else, this should not happen ??? catch this error and do nothing to database
+    else:
+        print(f"ISSUE: Multiple watches open --> {watches}")
