@@ -7,6 +7,7 @@ from boto3.dynamodb.conditions import Key, Attr
 import phonenumbers as pn
 import pytz
 from twilio.twiml.messaging_response import MessagingResponse
+from nlp_utils import detect_deletion_message, detect_update_message, extract_park_name, extract_ride_name, extract_wait_time
 from s3_select_wrapper import query_s3, reduce_to_ascii
 
 
@@ -27,25 +28,33 @@ def create_response(message):
 
 def lambda_handler(event=None, context=None):
     payload = {k:unquote_plus(v) for k,v in event.items()}
-    # TODO: currently assuming "park \n ride \n wait time" - use NLP instead
     body = reduce_to_ascii(payload['Body'])
-    park_name, ride_name, target_wait_time = [n.strip() for n in body.split('\n')]
-    target_wait_time = int(target_wait_time)
+
+    # extract wait time and parse phone number
+    target_wait_time = int(extract_wait_time(body))
     phone_number = pn.format_number(
         pn.parse(payload['From'], "US"),
         pn.PhoneNumberFormat.E164,
     )
 
-    # use park name to get park id [s3 select]
-    park_name_sanitized = park_name.replace("'","''").lower()
-    expression = f"select * from s3object[*][*].parks[*] as s where lower(s.name) = '{park_name_sanitized}' limit 1"
-    park_record = query_s3(expression, 'parks.json', source_bucket)[0]
-    print(f"{park_name} ::: park_id = {park_record['id']}")
+    # deduce park_name and park_id from message
+    expression = f"select * from s3object[*][*].parks[*] as s"
+    results = query_s3(expression, 'parks.json', source_bucket)
+    park_name = extract_park_name(body, [r['name'] for r in results])
+    for r in results:
+        if r['name'] == park_name:
+            park_record = r
+            break
+    s3_key = f"wait-times/{park_record['id']}.json"
 
-    # use park id to query wait time by ride name [s3 select]
+    # extract ride_name from message
+    expression = f"select s.name from s3object[*].waits.lands[*].rides[*] as s"
+    results = query_s3(expression, s3_key, source_bucket)
+    ride_name = extract_ride_name(body, [r['name'] for r in results])
+
+    # query full record for just this one ride
     ride_name_sanitized = ride_name.replace("'", "''").lower()
     expression = f"select * from s3object[*].waits.lands[*].rides[*] as s where lower(s.name) = '{ride_name_sanitized}' limit 1"
-    s3_key = f"wait-times/{park_record['id']}.json"
     ride_record = query_s3(expression, s3_key, source_bucket)[0]
     print(f"{ride_name} ::: wait_time = {ride_record['wait_time']} (is_open = {ride_record['is_open']})")
     
@@ -126,7 +135,7 @@ def lambda_handler(event=None, context=None):
         }
         table.put_item(Item=data)
         print(f"Created watch in Dynamo: {data}")
-        msg = f"Now watching {ride_record['name']} until {expiration_readable} for a queue time of {target_wait_time} minutes or less! Currently {ride_record['wait_time']} min. Powered by https://queue-times.com/parks/{park_record['id']}."
+        msg = f"Now watching {ride_record['name']} at {park_record['name']} until {expiration_readable} for a line shorter than {target_wait_time} minutes! Currently {ride_record['wait_time']} min. Powered by https://queue-times.com/parks/{park_record['id']}."
         return create_response(msg)
     
     # else, this should not happen ??? catch this error and do nothing to database

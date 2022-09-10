@@ -1,4 +1,5 @@
 dynamodb-json
+thefuzz[speedup]
 twilio
 phonenumbers
 pytz
