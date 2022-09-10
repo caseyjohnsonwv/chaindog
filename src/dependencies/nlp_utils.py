@@ -9,7 +9,7 @@ class NLPException(Exception):
 
 # temporary bad solution - can we do semantic matching?
 class ActionKeywords:
-    DELETE = ['delete', 'cancel', 'end', 'stop']
+    DELETE = ['delete', 'cancel', 'end', 'forget', 'stop']
     UPDATE = ['change', 'edit', 'extend', 'modify', 'update']
 
 
@@ -39,18 +39,14 @@ def extract_wait_time(msg:str) -> int:
 
 def detect_deletion_message(msg:str) -> bool:
     # temporary bad solution - can we do semantic matching?
-    res = _extract_best_match(msg, ActionKeywords.DELETE, threshold=90)
-    if res is None:
-        return False
-    return True
+    _, word = _extract_best_match(msg, ActionKeywords.DELETE, threshold=90)
+    return False if word is None else True
 
 
-def detect_update_message(msg:str) -> bool:
-    # temporary bad solution - can we do semantic matching?
-    res = _extract_best_match(msg, ActionKeywords.UPDATE, threshold=90)
-    if res is None:
-        return False
-    return True
+# def detect_update_message(msg:str) -> bool:
+#     # temporary bad solution - can we do semantic matching?
+#     _, word = _extract_best_match(msg, ActionKeywords.UPDATE, threshold=90)
+#     return False if word is None else True
 
 
 ### HELPER FUNCTIONS ###
@@ -65,6 +61,7 @@ def _extract_best_match(msg:str, match_list:List[str], threshold:int=0) -> Tuple
             best_ratio = ratio
         if ratio == 100:
             break
-    if best_ratio < threshold:
-        raise NLPException()
-    return closest_match_index, match_list[closest_match_index]
+    if best_ratio > threshold:
+        return closest_match_index, match_list[closest_match_index]
+    else:
+        return -1, None
