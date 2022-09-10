@@ -85,19 +85,21 @@ def lambda_handler(event=None, context=None):
 
             # condition for a watch to be extended
             # ie, ride is closed and watch is about to expire
-            if not records[r]['is_open'] and expiration <= expiration_soon:
-                print(f"Extending {watch} ::: {watch['ride_name']} is closed")
-                msg = f"It looks like {watch['ride_name']} is closed right now! We've extended your watch for a line shorter than {watch['wait_time_minutes']} minutes until {new_expiration_readable}."
-                table.update_item(
-                    Key = {
-                        'watch_id' : watch['watch_id']
-                    },
-                    UpdateExpression = 'SET expiration = :exp_ts',
-                    ExpressionAttributeValues = {
-                        ':exp_ts' : new_expiration.isoformat()
-                    }
-                )
-                push_sms(msg, watch['phone_number'])
+            if not records[r]['is_open']:
+                # but if it's not expiring soon, just leave it alone
+                if expiration <= expiration_soon:
+                    print(f"Extending {watch} ::: {watch['ride_name']} is closed")
+                    msg = f"It looks like {watch['ride_name']} is closed right now! We've extended your watch for a line shorter than {watch['wait_time_minutes']} minutes until {new_expiration_readable}."
+                    table.update_item(
+                        Key = {
+                            'watch_id' : watch['watch_id']
+                        },
+                        UpdateExpression = 'SET expiration = :exp_ts',
+                        ExpressionAttributeValues = {
+                            ':exp_ts' : new_expiration.isoformat()
+                        }
+                    )
+                    push_sms(msg, watch['phone_number'])
 
             
             # condition for a watch to be expired
