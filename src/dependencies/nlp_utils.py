@@ -39,8 +39,7 @@ def extract_wait_time(msg:str) -> int:
 
 def detect_deletion_message(msg:str) -> bool:
     # temporary bad solution - can we do semantic matching?
-    _, word = _extract_best_match(msg, ActionKeywords.DELETE, threshold=90)
-    return False if word is None else True
+    return any([True for w in ActionKeywords.DELETE if w.lower() in msg.lower()])
 
 
 # def detect_update_message(msg:str) -> bool:
