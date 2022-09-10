@@ -61,20 +61,33 @@ def lambda_handler(event=None, context=None):
         )
         return create_response(msg)
 
-    # deduce park_name and park_id from message
-    expression = f"select * from s3object[*][*].parks[*] as s"
-    results = query_s3(expression, 'parks.json', source_bucket)
-    park_name = extract_park_name(body, [r['name'] for r in results])
-    for r in results:
-        if r['name'] == park_name:
-            park_record = r
-            break
+    # get park data
+    user_current_park = None
+    if len(watches) > 0:
+        # look up full park record from one of the open watches
+        user_current_park = watches[0]['park_name']
+        park_name_sanitized = user_current_park.replace("'", "''")
+        expression = f"select * from s3object[*][*].parks[*] as s where s.name = '{park_name_sanitized}'"
+        park_record = query_s3(expression, 'parks.json', source_bucket)[0]
+    else:
+        # otherwise deduce park_name and park_id from message
+        expression = f"select * from s3object[*][*].parks[*] as s"
+        results = query_s3(expression, 'parks.json', source_bucket)
+        try:
+            park_name = extract_park_name(body, [r['name'] for r in results])
+        except NLPException:
+            msg = f"Whoops, we couldn't figure out what park you're asking about! Try rephrasing your message."
+            return create_response(msg)
+        for r in results:
+            if r['name'] == park_name:
+                park_record = r
+                break
     s3_key = f"wait-times/{park_record['id']}.json"
-    print(f"{park_name} ::: {s3_key}")
+    print(f"{park_record['name']} ::: {s3_key}")
 
     # ensure current request is for same park as existing watches
-    if len(watches) > 0 and watches[0]['park_name'] != park_name:
-        print(f"ISSUE: Requested watch for {park_name}, but user is at {watches[0]['park_name']}")
+    if user_current_park and user_current_park != park_record['name']:
+        print(f"ISSUE: Requested watch for {park_record['name']}, but user is at {watches[0]['park_name']}")
         msg = f"Our records show that you are watching rides at {watches[0]['park_name']}! Please cancel those watches before requesting rides at another park."
         return create_response(msg)
 
@@ -111,13 +124,13 @@ def lambda_handler(event=None, context=None):
         # tell user the ride is closed
         else:
             print(f"ISSUE: {ride_record['name']} is closed")
-            msg = f"Our data shows that {ride_record['name']} is currently closed - try again later!"
+            msg = f"Our data shows that {ride_record['name']} at {park_record['name']} is currently closed - try again later!"
         return create_response(msg)
 
     # ensure line is long enough to warrant a watch
     elif ride_record['wait_time'] <= target_wait_time:
         print(f"ISSUE: line already short enough")
-        msg = f"The line for {ride_record['name']} is currently {ride_record['wait_time']} minutes!"
+        msg = f"The line for {ride_record['name']} at {park_record['name']} is currently {ride_record['wait_time']} minutes!"
         # if user has a watch open, tell them and keep watching
         if watch:
             user_exp = datetime.fromisoformat(watch['expiration']).astimezone(tz).strftime('%-I:%M')
