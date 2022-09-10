@@ -10,7 +10,7 @@ class NLPException(Exception):
 # temporary bad solution - can we do semantic matching?
 class ActionKeywords:
     DELETE = ['delete', 'cancel', 'end', 'forget', 'stop']
-    UPDATE = ['change', 'edit', 'extend', 'modify', 'update']
+    # UPDATE = ['change', 'edit', 'extend', 'modify', 'update']
 
 
 def extract_park_name(msg:str, park_names:List[str]) -> str:
@@ -55,7 +55,7 @@ def detect_deletion_message(msg:str) -> bool:
 def _extract_best_match(msg:str, match_list:List[str], threshold:int=0) -> Tuple[int, str]:
     closest_match_index, best_ratio = None, 0
     for i,attempt in enumerate(match_list):
-        ratio = fuzz.token_set_ratio(msg, attempt)
+        ratio = fuzz.token_set_ratio(msg, attempt) + fuzz.token_sort_ratio(msg, attempt)
         if ratio > best_ratio:
             closest_match_index = i
             best_ratio = ratio
