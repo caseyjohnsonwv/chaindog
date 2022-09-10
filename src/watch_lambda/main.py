@@ -43,6 +43,21 @@ def lambda_handler(event=None, context=None):
             park_record = r
             break
     s3_key = f"wait-times/{park_record['id']}.json"
+    print(f"{park_name} ::: {s3_key}")
+
+    # grab any existing watches for this phone number
+    dynamodb = boto3.resource('dynamodb', region_name=aws_region)
+    table = dynamodb.Table(watch_table_name)
+    watches = table.query(
+        IndexName=dynamodb_index_name,
+        KeyConditionExpression=Key('phone_number').eq(phone_number),
+    )['Items']
+
+    # ensure current request is for same park as existing watches
+    if len(watches) > 0 and watches[0]['park_name'] != park_name:
+        print(f"ISSUE: Requested watch for {park_name}, but user is at {watches[0]['park_name']}")
+        msg = f"Our records show that you are watching rides at {watches[0]['park_name']}! Please cancel those watches before requesting rides at another park."
+        return create_response(msg)
 
     # extract ride_name from message
     expression = f"select s.name from s3object[*].waits.lands[*].rides[*] as s"
@@ -55,15 +70,8 @@ def lambda_handler(event=None, context=None):
     ride_record = query_s3(expression, s3_key, source_bucket)[0]
     print(f"{ride_name} ::: wait_time = {ride_record['wait_time']} (is_open = {ride_record['is_open']})")
     
-    # grab any existing watches for this ride/phone combination
-    dynamodb = boto3.resource('dynamodb', region_name=aws_region)
-    table = dynamodb.Table(watch_table_name)
-    watches = table.query(
-        IndexName=dynamodb_index_name,
-        KeyConditionExpression=Key('phone_number').eq(phone_number),
-        FilterExpression=Attr('ride_id').eq(ride_record['id']),
-        Limit=1,
-    )['Items']
+    # filter watches down to just thie requested ride
+    watches = [w for w in watches if w['ride_name'] == ride_name]
 
     # set up timezones / datetimes
     utc = pytz.timezone('UTC')
